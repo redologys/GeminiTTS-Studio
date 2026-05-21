@@ -1,0 +1,13 @@
+{
+  "name": "tts-studio",
+  "version": "1.0.0",
+  "description": "Standalone TTS Studio powered by OpenRouter and Gemini",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

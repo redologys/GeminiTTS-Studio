@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TTS Studio — Animal Mind</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:#0f0f0f;color:#e0e0e0;font-family:'Inter',sans-serif;display:flex;flex-direction:column;height:100vh}
+
+/* TOP BAR */
+.topbar{display:flex;align-items:center;gap:12px;padding:.6rem 1.25rem;border-bottom:1px solid #1c1c1c;flex-shrink:0}
+.topbar h1{font-size:.95rem;font-weight:700;color:#fff}
+.topbar .sub{font-size:.72rem;color:#444}
+
+/* MAIN LAYOUT */
+.layout{display:flex;flex:1;overflow:hidden}
+
+/* LEFT: GENERATOR */
+.generator{flex:1;min-width:400px;overflow-y:auto;padding:1.25rem;border-right:1px solid #1c1c1c}
+.field{margin-bottom:1rem}
+label{display:block;font-weight:600;margin-bottom:.28rem;color:#ccc;font-size:.83rem}
+.hint{font-weight:400;color:#555;margin-left:8px;font-size:.72rem}
+input,select,textarea{width:100%;padding:.58rem .75rem;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:#e0e0e0;font-size:.86rem}
+textarea{resize:vertical;line-height:1.6;font-family:'Courier New',monospace}
+.row{display:flex;gap:8px}
+.btn-gen{padding:.82rem;width:100%;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .15s;margin-top:.5rem}
+.btn-gen:hover{background:#4338ca}
+.btn-gen:disabled{background:#1e1e1e;color:#444;cursor:not-allowed}
+.save-btn{padding:0 .9rem;background:#4f46e5;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;white-space:nowrap}
+.save-btn.saved{background:#16a34a}
+.clear-btn{padding:0 .7rem;background:#1a1a1a;color:#777;border:1px solid #333;border-radius:6px;cursor:pointer;font-size:.78rem;white-space:nowrap}
+.status{margin-top:.65rem;font-size:.85rem}
+.ok{color:#22c55e}.err{color:#ef4444}.info{color:#888}
+.key-note{font-size:.68rem;color:#444;margin-top:4px}
+.lnk{font-size:.7rem;color:#444;margin-bottom:1rem}.lnk a{color:#6366f1}
+
+/* RIGHT: LIBRARY */
+.library-panel{width:360px;min-width:300px;overflow-y:auto;padding:.75rem;background:#0a0a0a;display:flex;flex-direction:column;flex-shrink:0}
+.lib-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem;flex-shrink:0}
+.lib-header h2{font-size:.85rem;font-weight:700;color:#fff}
+.lib-count{font-size:.68rem;color:#444}
+.lib-list{display:flex;flex-direction:column;gap:8px}
+.lib-empty{color:#333;font-size:.78rem;text-align:center;margin-top:2rem;line-height:1.6}
+
+/* LIBRARY CARD */
+.lib-card{background:#111;border:1px solid #1e1e1e;border-radius:8px;padding:.65rem}
+.card-header{display:flex;align-items:center;gap:6px;margin-bottom:.35rem}
+.card-name{flex:1;background:transparent;border:none;color:#fff;font-size:.82rem;font-weight:600;outline:none;border-bottom:1px solid transparent;transition:border-color .15s;min-width:0}
+.card-name:focus{border-bottom:1px solid #4f46e5}
+.card-date{font-size:.62rem;color:#3a3a3a;flex-shrink:0}
+.card-del{background:none;border:none;color:#2a2a2a;cursor:pointer;font-size:.75rem;padding:1px 4px;border-radius:4px;transition:color .15s;flex-shrink:0}
+.card-del:hover{color:#ef4444}
+.card-preview{font-size:.65rem;color:#3a3a3a;font-family:'Courier New',monospace;margin-bottom:.45rem;max-height:30px;overflow:hidden;line-height:1.4}
+.card-audio{width:100%;height:32px;margin-bottom:.45rem;display:block}
+
+/* CROP */
+.crop-box{background:#0d0d0d;border:1px solid #1a1a1a;border-radius:6px;padding:.45rem;margin-bottom:.45rem}
+.crop-label{font-size:.65rem;font-weight:600;color:#444;margin-bottom:.3rem}
+.crop-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.crop-field{display:flex;flex-direction:column;gap:2px}
+.crop-field label{font-size:.6rem;color:#444;font-weight:400;margin:0}
+.crop-field input{width:65px;padding:.25rem .4rem;font-size:.75rem}
+.crop-btn{padding:.3rem .6rem;background:#4f46e5;color:#fff;border:none;border-radius:4px;font-size:.7rem;font-weight:600;cursor:pointer;transition:background .15s;align-self:flex-end}
+.crop-btn:hover{background:#4338ca}
+
+/* DL */
+.dl-btn{display:inline-block;padding:.3rem .7rem;background:#22c55e;color:#fff;border-radius:5px;font-weight:600;font-size:.7rem;transition:background .15s;cursor:pointer;border:none;text-decoration:none}
+.dl-btn:hover{background:#16a34a}
+.dl-btn:disabled{background:#1a1a1a;color:#444;cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🎙 TTS Studio</h1>
+  <span class="sub">Gemini 2.5 Flash TTS · Director's Chair · via OpenRouter · Auto-saved</span>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT: GENERATOR -->
+  <div class="generator">
+    <p class="lnk">Need a key? <a href="https://openrouter.ai/settings/keys" target="_blank">openrouter.ai/settings/keys →</a></p>
+
+    <div class="field">
+      <label>OpenRouter API Key</label>
+      <div class="row">
+        <input type="password" id="apiKey" placeholder="sk-or-..." style="flex:1"/>
+        <button class="save-btn" id="saveBtn" onclick="saveKey()">Save Key</button>
+        <button class="clear-btn" id="clearBtn" onclick="clearKey()" style="display:none">Clear</button>
+      </div>
+      <p class="key-note">Stored in your browser only. Never logged on any server.</p>
+    </div>
+
+    <div class="field">
+      <label>Voice</label>
+      <select id="voice"></select>
+    </div>
+
+    <div class="field">
+      <label>Temperature <span class="hint" id="tempVal">1.0</span></label>
+      <input type="range" id="temperature" min="0" max="2" step="0.1" value="1.0" oninput="sel('tempVal').textContent=this.value">
+    </div>
+
+    <div class="field">
+      <label>Speed <span class="hint" id="speedVal">1.0</span></label>
+      <input type="range" id="speed" min="0.25" max="4.0" step="0.05" value="1.0" oninput="sel('speedVal').textContent=this.value">
+    </div>
+
+    <div class="field">
+      <label>Audio Profile <span class="hint">Character name, role, archetype</span></label>
+      <textarea id="audioProfile" rows="3" placeholder="# AUDIO PROFILE: Warm Observational Wildlife Narrator"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Scene <span class="hint">Location, mood, environment</span></label>
+      <textarea id="scene" rows="4" placeholder="## THE SCENE: A quiet suburban backyard at dawn..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Director's Notes <span class="hint">Style, pacing, accent</span></label>
+      <textarea id="directorNotes" rows="5" placeholder="### DIRECTOR'S NOTES&#10;Style: Empathetic&#10;Pacing: Natural"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Sample Context <span class="hint">What is this show / who is the narrator</span></label>
+      <textarea id="sampleContext" rows="3" placeholder="Warm animal documentary narration about crow memory..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Transcript <span class="hint">[neutral] [curious] [interest] [tension] [fast] [slow] [long pause] etc.</span></label>
+      <textarea id="transcript" rows="14" placeholder="[neutral] A crow can remember a face for years.&#10;[curious] Most people think it is just reacting to movement or noise."></textarea>
+    </div>
+
+    <button class="btn-gen" id="genBtn" onclick="generate()">Generate Audio</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- RIGHT: LIBRARY -->
+  <div class="library-panel">
+    <div class="lib-header">
+      <div style="display:flex; align-items:center; gap:10px">
+        <h2>Library</h2>
+        <select id="sortSelect" onchange="renderLibrary()" style="width:auto; padding:2px 6px; font-size:0.72rem; background:#1a1a1a; color:#888; border:1px solid #2a2a2a; border-radius:4px; outline:none; cursor:pointer">
+          <option value="date_desc">Newest First</option>
+          <option value="date_asc">Oldest First</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="duration_desc">Longest First</option>
+        </select>
+      </div>
+      <span class="lib-count" id="libCount">0 generations</span>
+    </div>
+    <div class="lib-list" id="libList"></div>
+    <div class="lib-empty" id="libEmpty">No generations yet.<br/>Hit Generate to build your library.</div>
+  </div>
+
+</div>
+
+<script>
+const VOICES=['Charon','Kore','Fenrir','Orus','Algieba','Iapetus','Alnilam','Schedar','Gacrux','Rasalgethi','Sadaltager','Zephyr','Puck','Leda','Aoede','Callirrhoe','Autonoe','Enceladus','Umbriel','Despina','Erinome','Algenib','Laomedeia','Achernar','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sulafat'];
+const vSel=document.getElementById('voice');
+VOICES.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;vSel.appendChild(o);});
+
+const ls=k=>localStorage.getItem('tts_'+k)||'';
+const lsSet=(k,v)=>localStorage.setItem('tts_'+k,v);
+const sel=id=>document.getElementById(id);
+
+window.onload=()=>{
+  sel('apiKey').value=ls('apiKey');
+  if(ls('apiKey')){sel('saveBtn').textContent='✅ Saved';sel('saveBtn').className='save-btn saved';sel('clearBtn').style.display='';}
+  sel('voice').value=ls('voice')||'Aoede';
+  sel('temperature').value=ls('temperature')||'1.0';
+  sel('tempVal').textContent=sel('temperature').value;
+  sel('speed').value=ls('speed')||'1.0';
+  sel('speedVal').textContent=sel('speed').value;
+  ['audioProfile','scene','directorNotes','sampleContext','transcript','temperature','speed'].forEach(f=>{
+    const v=ls(f);
+    if(v) sel(f).value=v;
+  });
+  ['apiKey','voice','audioProfile','scene','directorNotes','sampleContext','transcript','temperature','speed'].forEach(f=>sel(f).addEventListener('input',()=>lsSet(f,sel(f).value)));
+  loadLibrary();
+};
+
+function saveKey(){
+  lsSet('apiKey',sel('apiKey').value);
+  sel('saveBtn').textContent='✅ Saved';sel('saveBtn').className='save-btn saved';
+  sel('clearBtn').style.display='';
+  setStatus('✅ API key saved.','ok');setTimeout(()=>setStatus('',''),2000);
+}
+function clearKey(){
+  localStorage.removeItem('tts_apiKey');
+  sel('apiKey').value='';
+  sel('saveBtn').textContent='Save Key';sel('saveBtn').className='save-btn';
+  sel('clearBtn').style.display='none';
+}
+function setStatus(msg,cls){const el=sel('status');el.textContent=msg;el.className='status '+cls;}
+
+function pcmToWav(pcm,sr,ch,bd){
+  const dl=pcm.byteLength,buf=new ArrayBuffer(44+dl),v=new DataView(buf);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+dl,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,ch,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*ch*(bd/8),true);
+  v.setUint16(32,ch*(bd/8),true);v.setUint16(34,bd,true);
+  ws(36,'data');v.setUint32(40,dl,true);
+  new Uint8Array(buf).set(new Uint8Array(pcm),44);
+  return buf;
+}
+
+function cropWav(wavBuf,startSec,endSec){
+  const sr=24000,bps=2;
+  const startByte=Math.max(0,Math.floor(startSec*sr)*bps);
+  const endByte=Math.min(wavBuf.byteLength-44,Math.floor(endSec*sr)*bps);
+  if(endByte<=startByte){alert('End must be greater than start.');return null;}
+  const pcm=wavBuf.slice(44+startByte,44+endByte);
+  return pcmToWav(pcm,sr,1,16);
+}
+
+let library=[];
+
+async function loadLibrary(){
+  try {
+    const res = await fetch('/api/generations');
+    library = await res.json();
+  } catch(e) {
+    library = [];
+  }
+  renderLibrary();
+}
+
+function renderLibrary(){
+  const list=sel('libList');
+  const empty=sel('libEmpty');
+  const count=sel('libCount');
+  const sort = sel('sortSelect').value;
+
+  let displayList = [...library];
+  if(sort === 'date_desc') displayList.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  else if(sort === 'date_asc') displayList.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+  else if(sort === 'name_asc') displayList.sort((a,b) => a.name.localeCompare(b.name));
+  else if(sort === 'duration_desc') displayList.sort((a,b) => (b.duration||0) - (a.duration||0));
+
+  list.innerHTML='';
+  count.textContent=library.length+' generation'+(library.length===1?'':'s');
+  if(library.length===0){empty.style.display='block';return;}
+  empty.style.display='none';
+
+  displayList.forEach((entry,idx)=>{
+    const card=document.createElement('div');
+    card.className='lib-card';
+
+    // Header
+    const hdr=document.createElement('div');
+    hdr.className='card-header';
+
+    const nameEl=document.createElement('input');
+    nameEl.type='text';nameEl.className='card-name';nameEl.value=entry.name;
+    nameEl.title='Click to rename';
+    nameEl.addEventListener('blur', async ()=>{
+      if(nameEl.value !== entry.name) {
+        entry.name=nameEl.value;
+        await fetch('/api/generations/' + entry.id, { method: 'PATCH', body: JSON.stringify({ name: entry.name }) });
+      }
+    });
+    nameEl.addEventListener('keydown',e=>{if(e.key==='Enter')nameEl.blur();});
+
+    const dateEl=document.createElement('span');
+    dateEl.className='card-date';
+    dateEl.textContent=new Date(entry.createdAt).toLocaleString();
+
+    const delBtn=document.createElement('button');
+    delBtn.className='card-del';delBtn.textContent='✕';delBtn.title='Delete';
+    delBtn.addEventListener('click', async ()=>{
+      if(confirm('Delete "'+entry.name+'"?')){
+        await fetch('/api/generations/' + entry.id, { method: 'DELETE' });
+        library = library.filter(e => e.id !== entry.id);
+        renderLibrary();
+      }
+    });
+
+    hdr.appendChild(nameEl);hdr.appendChild(dateEl);hdr.appendChild(delBtn);
+    card.appendChild(hdr);
+
+    // Transcript preview
+    if(entry.transcript){
+      const pre=document.createElement('div');
+      pre.className='card-preview';
+      pre.textContent=entry.transcript.slice(0,160)+(entry.transcript.length>160?'…':'');
+      card.appendChild(pre);
+    }
+
+    // Audio
+    const audioEl=document.createElement('audio');
+    audioEl.controls=true;audioEl.className='card-audio';
+    audioEl.src = '/generations/' + entry.id + '.wav';
+    card.appendChild(audioEl);
+
+    // Crop
+    const cropBox=document.createElement('div');cropBox.className='crop-box';
+    const cropLbl=document.createElement('div');cropLbl.className='crop-label';cropLbl.textContent='✂ Crop Audio';
+    cropBox.appendChild(cropLbl);
+    const cropRow=document.createElement('div');cropRow.className='crop-row';
+
+    const mkField=(lbl,val,uid)=>{
+      const wrap=document.createElement('div');wrap.className='crop-field';
+      const l=document.createElement('label');l.textContent=lbl;l.htmlFor=uid;
+      const inp=document.createElement('input');inp.type='number';inp.id=uid;inp.value=val;min='0';inp.step='0.1';
+      wrap.appendChild(l);wrap.appendChild(inp);return wrap;
+    };
+
+    const sid='cs'+entry.id,eid='ce'+entry.id;
+    cropRow.appendChild(mkField('Start (sec)','0',sid));
+    cropRow.appendChild(mkField('End (sec)',entry.duration>0?entry.duration.toFixed(1):'',eid));
+
+    const cropBtn=document.createElement('button');
+    cropBtn.className='crop-btn';cropBtn.textContent='Crop & Save';
+    cropBtn.addEventListener('click', async ()=>{
+      const s=parseFloat(document.getElementById(sid).value)||0;
+      const e=parseFloat(document.getElementById(eid).value)||0;
+      
+      let buf = entry.wavBuf;
+      if(!buf) {
+        cropBtn.textContent = '⏳ Loading...';
+        const res = await fetch('/generations/' + entry.id + '.wav');
+        buf = await res.arrayBuffer();
+        entry.wavBuf = buf;
+      }
+      
+      const cropped=cropWav(buf,s,e);
+      if(!cropped) {
+        cropBtn.textContent = 'Crop & Save';
+        return;
+      }
+      
+      // Update on server
+      const meta = { ...entry, duration: e-s };
+      delete meta.wavBuf; // Don't send buffer in JSON meta
+      
+      const wavBlob = new Blob([cropped], { type: 'audio/wav' });
+      await uploadGeneration(meta, wavBlob, true);
+      
+      entry.duration = e - s;
+      entry.wavBuf = cropped;
+      
+      audioEl.src = '/generations/' + entry.id + '.wav?t=' + Date.now();
+      const dlA=card.querySelector('.dl-btn');
+      if(dlA){dlA.href=audioEl.src;dlA.download=(entry.name||'take')+'.wav';}
+      
+      cropBtn.textContent='✓ Cropped';
+      setTimeout(()=>cropBtn.textContent='Crop & Save',1500);
+    });
+    cropRow.appendChild(cropBtn);
+    cropBox.appendChild(cropRow);
+    card.appendChild(cropBox);
+
+    // Download — replace the <a> with a JS blob button
+    const dlBtn=document.createElement('button');
+    dlBtn.className='dl-btn';dlBtn.textContent='⬇ Download WAV';
+    dlBtn.addEventListener('click', async ()=>{
+      dlBtn.textContent='⏳ Downloading…';dlBtn.disabled=true;
+      try {
+        let blob;
+        if (entry.wavBuf) {
+          blob = new Blob([entry.wavBuf], { type: 'audio/wav' });
+        } else {
+          const res = await fetch('/generations/'+entry.id+'.wav');
+          if(!res.ok) throw new Error('HTTP '+res.status);
+          blob = await res.blob();
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url;a.download=(entry.name||'take')+'.wav';
+        document.body.appendChild(a);a.click();
+        setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
+        dlBtn.textContent='✅ Downloaded';
+        setTimeout(()=>{dlBtn.textContent='⬇ Download WAV';dlBtn.disabled=false;},2500);
+      } catch(e){
+        alert('Download failed: '+e.message);
+        dlBtn.textContent='⬇ Download WAV';dlBtn.disabled=false;
+      }
+    });
+    card.appendChild(dlBtn);
+
+    list.appendChild(card);
+  });
+}
+
+async function uploadGeneration(meta, wavBlob, isUpdate = false) {
+  const jsonStr = JSON.stringify(meta);
+  const jsonBytes = new TextEncoder().encode(jsonStr);
+  const jsonLen = jsonBytes.length;
+  
+  const buffer = new Uint8Array(4 + jsonLen + wavBlob.size);
+  const view = new DataView(buffer.buffer);
+  view.setUint32(0, jsonLen);
+  buffer.set(jsonBytes, 4);
+  const audioBytes = new Uint8Array(await wavBlob.arrayBuffer());
+  buffer.set(audioBytes, 4 + jsonLen);
+  
+  await fetch('/api/save', { method: 'POST', body: buffer });
+}
+
+async function generate(){
+  const apiKey=sel('apiKey').value.trim();
+  const transcript=sel('transcript').value.trim();
+  const temperature=parseFloat(sel('temperature').value);
+  const speed=parseFloat(sel('speed').value);
+  if(!apiKey){setStatus('⚠️ Enter your OpenRouter API key.','err');return;}
+  if(!transcript){setStatus('⚠️ Transcript is required.','err');return;}
+
+  sel('genBtn').disabled=true;
+  setStatus('⏳ Starting generation…','info');
+
+  const parts=[];
+  ['audioProfile','scene','directorNotes'].forEach(f=>{const v=sel(f).value.trim();if(v)parts.push(v);});
+  const sc=sel('sampleContext').value.trim();
+  if(sc)parts.push('### SAMPLE CONTEXT\n'+sc);
+  const prefix = parts.join('\n\n');
+
+  const CHUNK_SIZE = 800;
+  const chunks = [];
+  let currentChunk = "";
+  const sentences = transcript.split(/(?<=[.!?])\s+|\n+/);
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > CHUNK_SIZE && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = "";
+    }
+    currentChunk += (currentChunk ? " " : "") + sentence;
+  }
+  if (currentChunk) chunks.push(currentChunk.trim());
+
+  const pcmBuffers = [];
+  try {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkLabel = chunks.length > 1 ? ` (Chunk ${i+1}/${chunks.length})` : '';
+      const startTime = Date.now();
+      const timer = setInterval(() => {
+        const s = Math.round((Date.now() - startTime) / 1000);
+        setStatus(`⏳ Generating audio${chunkLabel}… ${s}s`, 'info');
+      }, 500);
+      const fullInput = prefix ? `${prefix}\n\n${chunks[i]}` : chunks[i];
+      try {
+        const r = await fetch('/api/tts-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, voice: sel('voice').value.toLowerCase(), input: fullInput, temperature, speed })
+        });
+        clearInterval(timer);
+        if (!r.ok) {
+          const txt = await r.text();
+          throw new Error(`API error ${r.status}: ${txt.slice(0,200)}`);
+        }
+        pcmBuffers.push(await r.arrayBuffer());
+      } catch(e) { clearInterval(timer); throw e; }
+    }
+
+    setStatus('⏳ Stitching audio together…','info');
+    const totalLength = pcmBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+    const combinedPcm = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const buf of pcmBuffers) { combinedPcm.set(new Uint8Array(buf), offset); offset += buf.byteLength; }
+
+    const wav = pcmToWav(combinedPcm.buffer, 24000, 1, 16);
+    const dur = (totalLength / 2) / 24000;
+    const entry = { id: Date.now() + '', name: 'Take ' + (library.length + 1), createdAt: new Date().toISOString(), transcript, duration: dur };
+    const wavBlob = new Blob([wav], { type: 'audio/wav' });
+    await uploadGeneration(entry, wavBlob);
+    entry.wavBuf = wav;
+    library.unshift(entry);
+    renderLibrary();
+    setStatus('✅ Done! Saved to library.','ok');
+  } catch (e) {
+    setStatus('❌ ' + e.message, 'err');
+  }
+  sel('genBtn').disabled = false;
+}
+</script>
+
+</body>
+</html>

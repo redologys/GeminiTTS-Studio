@@ -1,0 +1,4 @@
+node_modules
+*.log
+generations/
+metadata.json
