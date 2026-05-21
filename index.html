@@ -75,7 +75,7 @@ textarea{resize:vertical;line-height:1.6;font-family:'Courier New',monospace}
 
 <div class="topbar">
   <h1>🎙 TTS Studio</h1>
-  <span class="sub">Gemini 2.5 Flash TTS · Director's Chair · via OpenRouter · Auto-saved</span>
+  <span class="sub">Gemini 2.5 Flash TTS · Director's Chair · via OpenRouter · Browser-Saved</span>
 </div>
 
 <div class="layout">
@@ -159,6 +159,56 @@ textarea{resize:vertical;line-height:1.6;font-family:'Courier New',monospace}
 </div>
 
 <script>
+// --- DB SETUP ---
+const DB_NAME = 'TTS_Studio_DB';
+const DB_VERSION = 1;
+const STORE_NAME = 'generations';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function saveAudio(id, blob) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put({ id, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function getAudio(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).get(id);
+    request.onsuccess = (e) => resolve(e.target.result ? e.target.result.blob : null);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function deleteAudio(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+// --- APP LOGIC ---
 const VOICES=['Charon','Kore','Fenrir','Orus','Algieba','Iapetus','Alnilam','Schedar','Gacrux','Rasalgethi','Sadaltager','Zephyr','Puck','Leda','Aoede','Callirrhoe','Autonoe','Enceladus','Umbriel','Despina','Erinome','Algenib','Laomedeia','Achernar','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sulafat'];
 const vSel=document.getElementById('voice');
 VOICES.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;vSel.appendChild(o);});
@@ -167,7 +217,9 @@ const ls=k=>localStorage.getItem('tts_'+k)||'';
 const lsSet=(k,v)=>localStorage.setItem('tts_'+k,v);
 const sel=id=>document.getElementById(id);
 
-window.onload=()=>{
+let library=[];
+
+window.onload=async ()=>{
   sel('apiKey').value=ls('apiKey');
   if(ls('apiKey')){sel('saveBtn').textContent='✅ Saved';sel('saveBtn').className='save-btn saved';sel('clearBtn').style.display='';}
   sel('voice').value=ls('voice')||'Aoede';
@@ -180,6 +232,7 @@ window.onload=()=>{
     if(v) sel(f).value=v;
   });
   ['apiKey','voice','audioProfile','scene','directorNotes','sampleContext','transcript','temperature','speed'].forEach(f=>sel(f).addEventListener('input',()=>lsSet(f,sel(f).value)));
+  
   loadLibrary();
 };
 
@@ -218,19 +271,21 @@ function cropWav(wavBuf,startSec,endSec){
   return pcmToWav(pcm,sr,1,16);
 }
 
-let library=[];
-
-async function loadLibrary(){
+function loadLibrary(){
   try {
-    const res = await fetch('/api/generations');
-    library = await res.json();
+    const data = localStorage.getItem('tts_library');
+    library = data ? JSON.parse(data) : [];
   } catch(e) {
     library = [];
   }
   renderLibrary();
 }
 
-function renderLibrary(){
+function saveLibrary() {
+  localStorage.setItem('tts_library', JSON.stringify(library));
+}
+
+async function renderLibrary(){
   const list=sel('libList');
   const empty=sel('libEmpty');
   const count=sel('libCount');
@@ -247,7 +302,7 @@ function renderLibrary(){
   if(library.length===0){empty.style.display='block';return;}
   empty.style.display='none';
 
-  displayList.forEach((entry,idx)=>{
+  for (const entry of displayList) {
     const card=document.createElement('div');
     card.className='lib-card';
 
@@ -258,10 +313,10 @@ function renderLibrary(){
     const nameEl=document.createElement('input');
     nameEl.type='text';nameEl.className='card-name';nameEl.value=entry.name;
     nameEl.title='Click to rename';
-    nameEl.addEventListener('blur', async ()=>{
+    nameEl.addEventListener('blur', ()=>{
       if(nameEl.value !== entry.name) {
         entry.name=nameEl.value;
-        await fetch('/api/generations/' + entry.id, { method: 'PATCH', body: JSON.stringify({ name: entry.name }) });
+        saveLibrary();
       }
     });
     nameEl.addEventListener('keydown',e=>{if(e.key==='Enter')nameEl.blur();});
@@ -274,8 +329,9 @@ function renderLibrary(){
     delBtn.className='card-del';delBtn.textContent='✕';delBtn.title='Delete';
     delBtn.addEventListener('click', async ()=>{
       if(confirm('Delete "'+entry.name+'"?')){
-        await fetch('/api/generations/' + entry.id, { method: 'DELETE' });
         library = library.filter(e => e.id !== entry.id);
+        saveLibrary();
+        await deleteAudio(entry.id);
         renderLibrary();
       }
     });
@@ -294,7 +350,10 @@ function renderLibrary(){
     // Audio
     const audioEl=document.createElement('audio');
     audioEl.controls=true;audioEl.className='card-audio';
-    audioEl.src = '/generations/' + entry.id + '.wav';
+    const blob = await getAudio(entry.id);
+    if (blob) {
+      audioEl.src = URL.createObjectURL(blob);
+    }
     card.appendChild(audioEl);
 
     // Crop
@@ -320,34 +379,20 @@ function renderLibrary(){
       const s=parseFloat(document.getElementById(sid).value)||0;
       const e=parseFloat(document.getElementById(eid).value)||0;
       
-      let buf = entry.wavBuf;
-      if(!buf) {
-        cropBtn.textContent = '⏳ Loading...';
-        const res = await fetch('/generations/' + entry.id + '.wav');
-        buf = await res.arrayBuffer();
-        entry.wavBuf = buf;
-      }
+      const currentBlob = await getAudio(entry.id);
+      if (!currentBlob) return;
       
+      const buf = await currentBlob.arrayBuffer();
       const cropped=cropWav(buf,s,e);
-      if(!cropped) {
-        cropBtn.textContent = 'Crop & Save';
-        return;
-      }
+      if(!cropped) return;
       
-      // Update on server
-      const meta = { ...entry, duration: e-s };
-      delete meta.wavBuf; // Don't send buffer in JSON meta
-      
-      const wavBlob = new Blob([cropped], { type: 'audio/wav' });
-      await uploadGeneration(meta, wavBlob, true);
+      const croppedBlob = new Blob([cropped], { type: 'audio/wav' });
+      await saveAudio(entry.id, croppedBlob);
       
       entry.duration = e - s;
-      entry.wavBuf = cropped;
+      saveLibrary();
       
-      audioEl.src = '/generations/' + entry.id + '.wav?t=' + Date.now();
-      const dlA=card.querySelector('.dl-btn');
-      if(dlA){dlA.href=audioEl.src;dlA.download=(entry.name||'take')+'.wav';}
-      
+      audioEl.src = URL.createObjectURL(croppedBlob);
       cropBtn.textContent='✓ Cropped';
       setTimeout(()=>cropBtn.textContent='Crop & Save',1500);
     });
@@ -355,20 +400,14 @@ function renderLibrary(){
     cropBox.appendChild(cropRow);
     card.appendChild(cropBox);
 
-    // Download — replace the <a> with a JS blob button
+    // Download
     const dlBtn=document.createElement('button');
     dlBtn.className='dl-btn';dlBtn.textContent='⬇ Download WAV';
     dlBtn.addEventListener('click', async ()=>{
       dlBtn.textContent='⏳ Downloading…';dlBtn.disabled=true;
       try {
-        let blob;
-        if (entry.wavBuf) {
-          blob = new Blob([entry.wavBuf], { type: 'audio/wav' });
-        } else {
-          const res = await fetch('/generations/'+entry.id+'.wav');
-          if(!res.ok) throw new Error('HTTP '+res.status);
-          blob = await res.blob();
-        }
+        const blob = await getAudio(entry.id);
+        if(!blob) throw new Error('Audio not found in local DB');
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href=url;a.download=(entry.name||'take')+'.wav';
@@ -376,30 +415,15 @@ function renderLibrary(){
         setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
         dlBtn.textContent='✅ Downloaded';
         setTimeout(()=>{dlBtn.textContent='⬇ Download WAV';dlBtn.disabled=false;},2500);
-      } catch(e){
-        alert('Download failed: '+e.message);
+      } catch(err){
+        alert('Download failed: '+err.message);
         dlBtn.textContent='⬇ Download WAV';dlBtn.disabled=false;
       }
     });
     card.appendChild(dlBtn);
 
     list.appendChild(card);
-  });
-}
-
-async function uploadGeneration(meta, wavBlob, isUpdate = false) {
-  const jsonStr = JSON.stringify(meta);
-  const jsonBytes = new TextEncoder().encode(jsonStr);
-  const jsonLen = jsonBytes.length;
-  
-  const buffer = new Uint8Array(4 + jsonLen + wavBlob.size);
-  const view = new DataView(buffer.buffer);
-  view.setUint32(0, jsonLen);
-  buffer.set(jsonBytes, 4);
-  const audioBytes = new Uint8Array(await wavBlob.arrayBuffer());
-  buffer.set(audioBytes, 4 + jsonLen);
-  
-  await fetch('/api/save', { method: 'POST', body: buffer });
+  }
 }
 
 async function generate(){
@@ -465,13 +489,16 @@ async function generate(){
 
     const wav = pcmToWav(combinedPcm.buffer, 24000, 1, 16);
     const dur = (totalLength / 2) / 24000;
-    const entry = { id: Date.now() + '', name: 'Take ' + (library.length + 1), createdAt: new Date().toISOString(), transcript, duration: dur };
+    const id = Date.now() + '';
+    const entry = { id, name: 'Take ' + (library.length + 1), createdAt: new Date().toISOString(), transcript, duration: dur };
+    
     const wavBlob = new Blob([wav], { type: 'audio/wav' });
-    await uploadGeneration(entry, wavBlob);
-    entry.wavBuf = wav;
+    await saveAudio(id, wavBlob);
+    
     library.unshift(entry);
+    saveLibrary();
     renderLibrary();
-    setStatus('✅ Done! Saved to library.','ok');
+    setStatus('✅ Done! Saved to local library.','ok');
   } catch (e) {
     setStatus('❌ ' + e.message, 'err');
   }
